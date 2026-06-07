@@ -16,6 +16,9 @@ class VocabularyQuizApp:
         self.checked = False
         self.score = 0
         self.total = 0
+        self.wrong_words: list[Word] = []
+        self.review_mode = False
+        self.review_queue: list[Word] = []
 
         self.default_font = font.nametofont("TkDefaultFont")
         self.default_font.configure(family="NanumGothic", size=12)
@@ -25,12 +28,14 @@ class VocabularyQuizApp:
         root.resizable(False, False)
 
         self.word_var = tk.StringVar(value="단어를 불러오는 중...")
+        self.pronunciation_var = tk.StringVar(value="")
         self.feedback_var = tk.StringVar(value="")
         self.score_var = tk.StringVar(value="Score: 0/0")
         self.accuracy_var = tk.StringVar(value="정답률: 0.0%")
 
         ttk.Label(root, text="영단어").pack(pady=(16, 4))
         ttk.Label(root, textvariable=self.word_var, font=("NanumGothic", 24)).pack()
+        ttk.Label(root, textvariable=self.pronunciation_var, font=("NanumGothic", 12)).pack()
 
         self.answer_entry = ttk.Entry(root, font=("NanumGothic", 14))
         self.answer_entry.pack(pady=12, ipadx=6, ipady=4)
@@ -50,12 +55,25 @@ class VocabularyQuizApp:
         self.next_word()
 
     def next_word(self) -> None:
-        self.current = draw_word(self.words, self.rng)
-        self.word_var.set(self.current.term)
-        self.answer_entry.delete(0, tk.END)
+        if self.review_mode:
+            if not self.review_queue:
+                self.review_mode = False
+                self.review_button.state(["!disabled"])
+                self.feedback_var.set("오답 복습이 완료되었습니다.")
+                self.current = draw_word(self.words, self.rng)
+                self.word_var.set(self.current.term)
+                self.answer_entry.delete(0, tk.END)
+                self.checked = False
+                self.check_button.state(["!disabled"])
+                return
+            self.current = self.review_queue.pop(0)
+        else:
+            self.current = draw_word(self.words,self.rng)
+        self.word_var.set(self.corrent.term)
+        self.answer_entry.delete(0,tk.end)
         self.feedback_var.set("")
         self.checked = False
-        self.check_button.state(["!disabled"])
+        self.check_butten.state(["!disabled"])
         self.answer_entry.focus()
 
     def check_current(self) -> None:
@@ -68,11 +86,24 @@ class VocabularyQuizApp:
             self.score += 1
             self.feedback_var.set("정답입니다!")
         else:
+            if self.current not in self.wrong_words:
+                self.wrong_words.append(self.current)
             self.feedback_var.set(f"오답입니다. 정답: {self.current.meaning}")
         self.score_var.set(f"Score: {self.score}/{self.total}")
-        accuracy(self.score / self.total * 100)
+        accuracy = (self.score / self.total * 100
         if self.total > 0
         else 0
         )
         self.accuracy_var.set(f"정답률: {accuracy:.1f}%")
         self.check_button.state(["disabled"])
+    def start_review(self) -> None:
+        if self.review_mode:
+            return
+        if not self.wrong_words:
+            self.feedback_var.set("복습할 오답이 없습니다.")
+            return
+        self.review_mode = True
+        self.review_butten.state(["disabled"])
+        self.review_queue = (self.wrong_words.copy())
+        self.feedback_var.set(f"{len(self.review_queue)}개의 오답 복습 시작")
+        self.next_word()
